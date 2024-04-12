@@ -1,0 +1,200 @@
+---------------------------------------
+* CREATE VM: with default VPC
+
+gcloud compute instances create sumanth-vm --project ringed-hallway-417305 --machine-type=n1-standard-4 --zone=us-east1-b --service-account=terraform@ringed-hallway-417305.iam.gserviceaccount.com --image=ubuntu-2204-jammy-v20240319 --image-project=ubuntu-os-cloud --boot-disk-size=200GB --boot-disk-auto-delete --scopes=https://www.googleapis.com/auth/compute
+---------------------------------------
+To list available images: gcloud compute images list
+
+use the following as reference to take image you need from the list display.
+
+--image=ubuntu-2204-jammy-v20240319 --image-project=ubuntu-os-cloud
+NAME: ubuntu-2204-jammy-v20240319
+PROJECT: ubuntu-os-cloud
+FAMILY: ubuntu-2204-lts
+DEPRECATED: 
+STATUS: READY
+---------------------------------------
+To get the name or list the disks available: gcloud compute disks list
+NAME: sumanth-vm
+LOCATION: us-east1-b
+LOCATION_SCOPE: zone
+SIZE_GB: 200
+TYPE: pd-standard
+STATUS: READY
+
+* CREATE IMAGE FROM VM: Here you are using the above created vm's source disk as reference, so use its disk name as source.
+
+gcloud compute images create my-image --source-disk=sumanth-vm --source-disk-zone=us-east1-b
+
+NAME: my-image
+PROJECT: ringed-hallway-417305
+FAMILY: 
+DEPRECATED: 
+STATUS: READY
+
+NOTE:
+you need to stop the vm before taking image.
+---------------------------------------
+TO LIST IMAGES USING NAME: gcloud compute images list --filter="name=my-image"
+OUTPUT:
+NAME: my-image
+PROJECT: ringed-hallway-417305
+FAMILY: 
+DEPRECATED: 
+STATUS: READY
+
+* TO CREATE VM USING ABOVE IMAGE:
+
+gcloud compute instances create INSTANCE-NAME --image=my-image --image-project=ringed-hallway-417305 --machine-type=n1-standard-4 --zone=us-east1-b
+
+NOTE:
+make sure to change image, image-project .....
+---------------------------------------
+LIST ALL DISKS: gcloud compute disks list
+
+OUTPUT:
+NAME: sumanth-vm
+LOCATION: us-east1-b
+LOCATION_SCOPE: zone
+SIZE_GB: 200
+TYPE: pd-standard
+STATUS: READY
+
+* CREATE SNAPSHOT FROM VOLUME:
+gcloud compute disks snapshot sumanth-vm --snapshot-names=my-snap --zone=us-east1-b
+
+This command creates a snapshot named my-snapshot from a disk named sumanth-vm located in the us-east1-b zone. Adjust the values according to your disk and zone configurations.
+tolist the snapshots:
+gcloud compute snapshots list
+
+---------------------------------------
+CREATE VM USING ABOVE SNAPSHOT:
+gcloud compute instances create INSTANCE-NAME --machine-type=MACHINE-TYPE --source-snapshot=SNAPSHOT-NAME --zone=ZONE
+
+INSTANCE-NAME with the name you want to give to the new VM instance.
+MACHINE-TYPE with the desired machine type for the VM instance (e.g., n1-standard-2).
+SNAPSHOT-NAME with the name of the snapshot you want to use as the source for the boot disk.
+ZONE with the zone where you want to create the VM instance.
+
+EX:
+gcloud compute instances create my-vm --machine-type=n1-standard-2 --source-snapshot=my-snap --zone=us-west1-a
+
+---------------------------------------
+
+
+gcloud compute disks create my-disk --type=pd-standard --size=10GB --region=us-east1-b
+---------------------------------------
+LIST ALL SNAPSHOTS:
+gcloud compute snapshots list
+
+OUTPUT:
+NAME: my-snap
+DISK_SIZE_GB: 200
+SRC_DISK: us-east1-b/disks/sumanth-vm
+STATUS: READY
+
+* CREATE DISK FROM SNAPSHOT:Zonal disk
+gcloud compute disks create DISK-NAME --source-snapshot=SNAPSHOT-NAME --zone=ZONE
+
+EX:
+gcloud compute disks create zonal-disk --source-snapshot=my-snap --zone=us-east1-b
+
+OUTPUT:
+NAME: zonal-disk
+ZONE: us-east1-b
+SIZE_GB: 200
+TYPE: pd-standard
+STATUS: READY
+
+* CREATE DISK FROM SNAPSHOT:Regional disk-multi-regional, with increased size.
+gcloud compute disks create my-regional-disk --type=pd-standard --size=500GB --region=us-west1 --source-snapshot=my-snapshot --replica-zones=us-west1-a,us-west1-b
+
+OUTPUT:
+NAME: my-regional-disk
+ZONE: 
+SIZE_GB: 500
+TYPE: pd-standard
+STATUS: READY
+
+* CREATE DISK MANUALLY:
+gcloud compute disks create my-disk --type=pd-standard --size=10GB --zone=us-east1-b
+
+---------------------------------------
+TO LIST DISKS:
+gcloud compute disks list
+gcloud compute disks list --filter="name=my-regional-disk"
+
+
+OUTPUT:
+NAME: my-regional-disk
+LOCATION: us-west1
+LOCATION_SCOPE: region
+SIZE_GB: 500
+TYPE: pd-standard
+STATUS: READY
+
+NAME: zonal-disk
+LOCATION: us-east1-b
+LOCATION_SCOPE: zone
+SIZE_GB: 200
+TYPE: pd-standard
+STATUS: READY
+
+---------------------------------------
+Standard Persistent Disk (pd-standard)	 : Good for general use, offering reliable performance at a lower cost.
+SSD Persistent Disk(pd-ssd)		 : Provides high-performance storage with low latency and high IOPS, suitable for demanding applications.
+Balanced Persistent Disk (pd-balanced)	 : Offers a balance between performance and cost, providing better performance than Standard Disks at a reasonable price.
+---------------------------------------
+NOTE: using volume/disk we can create snapshot, images, and instance also.
+you cant create image and instance of regional disk.
+you can create snapshot from volume and vice-versa.
+if you want to create image or instance from regional disk first you need to create snapshot of it and then create from it.
+---------------------------------------
+gcloud compute instances create my-vm --machine-type=n1-standard-2 --source-snapshot=my-snap --zone=us-west1-a
+
+---------------------------------------
+
+
+* UPLOAD IMAGE TO STORAGE BUCKERT: Send the disk image file to a Cloud Storage bucket.
+
+To list images by name:
+gcloud compute images list --filter="name=my-image"
+
+To describe images:
+gcloud compute images describe my-image
+
+To export image to bucket:
+gcloud compute images export --image=my-image --image-project=ringed-hallway-417305 --destination-uri=gs://adq-bucket-getteam//sumanth.tar.gz --zone=us-east1-a
+
+NOTE:
+Make sure to create storage bucket and put it in destination-uri
+Change Image_name, image-project(give project where your image is located), and zone.
+
+Restricted regions for some projects
+Depending on usage, certain projects may be restricted to only use Cloud Build in the following regions:
+
+us-central1
+us-west2
+europe-west1
+asia-east1
+australia-southeast1
+southamerica-east1
+
+Using the image from storage bucket:
+gsutil cp gs://adq-bucket-getteam/image-export.tar.gz .
+image-export.tar.gz
+tar -xzvf image-export.tar.gz
+
+
+Use the custom image: When creating new virtual machines in GCP, select your custom image as the base.
+
+---------------------------------------
+gcloud compute disks create my-disk --type=pd-standard --size=10GB --region=us-east1-b
+
+gcloud compute images create my-image --source-disk=my-disk --source-disk-zone=us-east1-b
+
+gcloud compute images export --image=my-image --image-project=ringed-hallway-417305 --destination-uri=gs://adq-bucket-getteam//sumanth.tar.gz --zone=asia-east1
+
+to do:
+extract the image from storage bucket and create vm?
+
